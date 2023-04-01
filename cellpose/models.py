@@ -726,8 +726,9 @@ class CellposeModel(UnetModel):
         nimg = len(tr_ds)
 
         # compute average cell diameter
-        diam_train = np.array([utils.diameters(tr_ds[k][1][0])[0] for k in range(len(tr_ds))])
+        diam_train = np.array([utils.diameters(tr_ds.load_raw(k)[1][0])[0] for k in range(len(tr_ds))])
         diam_train_mean = diam_train[diam_train > 0].mean()
+        print(diam_train)
         self.diam_labels = diam_train_mean
         if rescale:
             diam_train[diam_train<5] = 5.
@@ -787,67 +788,64 @@ class CellposeModel(UnetModel):
         
         tr_ds.set_train_params(diam_mean=self.diam_mean, scale_range=scale_range, rescale=rescale, unet=self.unet)
         
-        with tqdm(tr_loader) as t_tr_loader:
-            for iepoch in range(self.n_epochs):
-                t_tr_loader.set_description(f'Epoch {iepoch}/{self.n_epochs}')
-                if SGD:
-                    self._set_learning_rate(self.learning_rate[iepoch])
-                for imgi, lbl in t_tr_loader:
-                    train_loss = self._train_step(imgi, lbl)
-                    lavg += train_loss
-                    nsum += len(imgi) 
+        for iepoch in range(self.n_epochs):
+            if SGD:
+                self._set_learning_rate(self.learning_rate[iepoch])
+            for imgi, lbl in tr_loader:
+                train_loss = self._train_step(imgi, lbl)
+                lavg += train_loss
+                nsum += len(imgi) 
 
-                lavg = lavg / nsum
-                # if test_data is not None:
-                #     lavgt, nsum = 0., 0
-                #     np.random.seed(42)
-                #     rperm = np.arange(0, len(test_data), 1, int)
-                #     for ibatch in range(0,len(test_data),batch_size):
-                #         inds = rperm[ibatch:ibatch+batch_size]
-                #         rsc = diam_test[inds] / self.diam_mean if rescale else np.ones(len(inds), np.float32)
-                #         imgi, lbl, scale = transforms.random_rotate_and_resize(
-                #                             [test_data[i] for i in inds], Y=[test_labels[i][1:] for i in inds], 
-                #                             scale_range=0., rescale=rsc, unet=self.unet) 
-                #         if self.unet and lbl.shape[1]>1 and rescale:
-                #             lbl[:,1] *= scale[:,np.newaxis,np.newaxis]**2
+            lavg = lavg / nsum
+            # if test_data is not None:
+            #     lavgt, nsum = 0., 0
+            #     np.random.seed(42)
+            #     rperm = np.arange(0, len(test_data), 1, int)
+            #     for ibatch in range(0,len(test_data),batch_size):
+            #         inds = rperm[ibatch:ibatch+batch_size]
+            #         rsc = diam_test[inds] / self.diam_mean if rescale else np.ones(len(inds), np.float32)
+            #         imgi, lbl, scale = transforms.random_rotate_and_resize(
+            #                             [test_data[i] for i in inds], Y=[test_labels[i][1:] for i in inds], 
+            #                             scale_range=0., rescale=rsc, unet=self.unet) 
+            #         if self.unet and lbl.shape[1]>1 and rescale:
+            #             lbl[:,1] *= scale[:,np.newaxis,np.newaxis]**2
 
-                #         test_loss = self._test_eval(imgi, lbl)
-                #         lavgt += test_loss
-                #         nsum += len(imgi)
+            #         test_loss = self._test_eval(imgi, lbl)
+            #         lavgt += test_loss
+            #         nsum += len(imgi)
 
-                #     models_logger.info('Epoch %d, Time %4.1fs, Loss %2.4f, Loss Test %2.4f, LR %2.4f'%
-                #             (iepoch, time.time()-tic, lavg, lavgt/nsum, self.learning_rate[iepoch]))
-                # else:
-                # models_logger.info('Epoch %d, Time %4.1fs, Loss %2.4f, LR %2.4f'%
-                #         (iepoch, time.time()-tic, lavg, self.learning_rate[iepoch]))
-                t_tr_loader.set_postfix({'loss': lavg, 'lr': self.learning_rate[iepoch]})
-                if lmin > lavg:
-                    lmin = lavg
-                    save = True
-                lavg, nsum = 0, 0
-                                
-                if save_path is not None:
-                    if save:
-                        # save model at the end
-                        if save_each: #separate files as model progresses 
-                            if model_name is None:
-                                file_name = '{}_{}_{}_{}'.format(self.net_type, file_label, 
-                                                                 d.strftime("%Y_%m_%d_%H_%M_%S.%f"),
-                                                                 'epoch_'+str(iepoch)) 
-                            else:
-                                file_name = '{}_{}'.format(model_name, 'epoch_'+str(iepoch))
+            #     models_logger.info('Epoch %d, Time %4.1fs, Loss %2.4f, Loss Test %2.4f, LR %2.4f'%
+            #             (iepoch, time.time()-tic, lavg, lavgt/nsum, self.learning_rate[iepoch]))
+            # else:
+            models_logger.info('Epoch %d, Time %4.1fs, Loss %2.4f, LR %2.4f' % (iepoch, time.time()-tic, lavg, self.learning_rate[iepoch]))
+            # t_tr_loader.set_postfix({'loss': lavg, 'lr': self.learning_rate[iepoch]})
+            if lmin > lavg:
+                lmin = lavg
+                save = True
+            lavg, nsum = 0, 0
+                            
+            if save_path is not None:
+                if save:
+                    # save model at the end
+                    if save_each: #separate files as model progresses 
+                        if model_name is None:
+                            file_name = '{}_{}_{}_{}'.format(self.net_type, file_label, 
+                                                             d.strftime("%Y_%m_%d_%H_%M_%S.%f"),
+                                                             'epoch_'+str(iepoch)) 
                         else:
-                            if model_name is None:
-                                file_name = '{}_{}_{}'.format(self.net_type, file_label, d.strftime("%Y_%m_%d_%H_%M_%S.%f"))
-                            else:
-                                file_name = model_name
-                        file_name = os.path.join(file_path, file_name)
-                        ksave += 1
-                        # models_logger.info(f'saving network parameters to {file_name}')
-                        self.net.save_model(file_name)
-                        save = False
-                else:
-                    file_name = save_path
+                            file_name = '{}_{}'.format(model_name, 'epoch_'+str(iepoch))
+                    else:
+                        if model_name is None:
+                            file_name = '{}_{}_{}'.format(self.net_type, file_label, d.strftime("%Y_%m_%d_%H_%M_%S.%f"))
+                        else:
+                            file_name = model_name
+                    file_name = os.path.join(file_path, file_name)
+                    ksave += 1
+                    # models_logger.info(f'saving network parameters to {file_name}')
+                    self.net.save_model(file_name)
+                    save = False
+            else:
+                file_name = save_path
 
         # reset to mkldnn if available
         self.net.mkldnn = self.mkldnn

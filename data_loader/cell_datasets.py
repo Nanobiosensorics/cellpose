@@ -50,6 +50,19 @@ class CellDataset(Dataset):
         self.rescale = rescale
         self.unet = unet
 
+    def load_raw(self, img_id):
+        if self.train:
+            # image
+            image = self.get_image(img_id)
+            # label
+            target = self.get_target(img_id) if self.train else {}
+            image, target = self.transform(image, target, raw=True)
+            return image, target
+        else:
+            image = self.get_image(img_id)
+            image, pre_info = self.transform(image, raw=True)
+            return image, pre_info
+
     def __getitem__(self, img_id):
         if self.train:
             # image
@@ -93,12 +106,14 @@ class CellDataset(Dataset):
         target = flows[0]
         return [target]
 
-    def transform(self, img, label=None):
+    def transform(self, img, label=None, raw=False):
         from time import time
         start = time()
         # dataset argument
         # step1: reshape and normalize data
         tr, ts, rn = transforms.reshape_and_normalize_data(img, channels=self.channels, normalize=True)
+        if raw:
+            return tr[0], label[0]
         # step2: random rotate and resize
         if self.train and label is not None:
             rsc = utils.diameters(label[0][0])[0] / self.diam_mean if self.rescale else 1.0
