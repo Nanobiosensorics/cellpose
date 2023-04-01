@@ -298,7 +298,7 @@ class UnetModel():
         return masks, flows, styles
 
     def _to_device(self, x):
-        X = torch.from_numpy(x).float().to(self.device)
+        X = x.float().to(self.device)
         return X
 
     def _from_device(self, X):

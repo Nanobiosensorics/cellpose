@@ -256,13 +256,16 @@ def load_images_labels(tdir, mask_filter='_masks', image_filter=None, look_one_l
         if os.path.isfile(label_names[n]):
             image = imread(image_names[n])
             label = imread(label_names[n])
-            if not unet:
-                if flow_names is not None and not unet:
-                    flow = imread(flow_names[n])
-                    if flow.shape[0]<4:
-                        label = np.concatenate((label[np.newaxis,:,:], flow), axis=0) 
-                    else:
-                        label = flow
+            # print(label.shape)
+            # if not unet:
+            #     if flow_names is not None and not unet:
+            #         flow = imread(flow_names[n])
+            #         if flow.shape[0]<4:
+            #             label = np.concatenate((label[np.newaxis,:,:], flow), axis=0) 
+            #         else:
+            #             label = flow
+            #         print(flow_names[n], label.shape)
+            # print(label_names[n], image.shape, label.shape)
             images.append(image)
             labels.append(label)
             k+=1
@@ -504,7 +507,7 @@ def save_masks(images, masks, flows, file_names, png=True, tif=False, channels=[
         outlines_to_text(os.path.join(txtdir,basename), outlines)
     
     # RGB outline images
-    if masks.ndim < 3 and save_outlines: 
+    if masks.ndim < 3 and save_outlines:
         check_dir(outlinedir) 
         outlines = utils.masks_to_outlines(masks)
         outX, outY = np.nonzero(outlines)

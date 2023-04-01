@@ -321,7 +321,7 @@ def labels_to_flows(labels, files=None, use_gpu=False, device=None, redo_flows=F
                 file_name = os.path.splitext(file)[0]
                 tifffile.imwrite(file_name+'_flows.tif', flow)
     else:
-        dynamics_logger.info('flows precomputed')
+        # dynamics_logger.info('flows precomputed')
         flows = [labels[n].astype(np.float32) for n in range(nimg)]
     return flows
 
