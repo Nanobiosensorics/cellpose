@@ -9,7 +9,7 @@ import torchvision.transforms as T
 
 
 class CellDataset(Dataset):
-    def __init__(self, data_dir, channels=[0,0], load_seg=False, train=True,):
+    def __init__(self, data_dir, channels=[0,0], load_seg=False, train=True, mask_filter='_seg.npy'):
         super().__init__()
         self.ids = []
         self.channels = channels
@@ -27,13 +27,12 @@ class CellDataset(Dataset):
             #     self.seg_list = [os.path.join(train_dir, f) for f in os.listdir(train_dir) if f.endswith('_seg.npy')]
             #     print(self.seg_list)
             # # else:
-            self.imgs = [f[:-4] for f in os.listdir(train_dir) if f.endswith('png') and 'mask' not in f]
-            self.img_list = [os.path.join(train_dir, f) for f in os.listdir(train_dir) if f.endswith('png') and 'mask' not in f ]
-            self.masks_list = [os.path.join(train_dir, f) for f in os.listdir(train_dir) if f.endswith('_masks.png')]
+            self.imgs = [f[:-4] for f in os.listdir(train_dir) if f.endswith('png')]
+            self.img_list = [os.path.join(train_dir, f + '.png') for f in self.imgs]
+            self.masks_list = [os.path.join(train_dir, f + mask_filter) for f in self.imgs]
             self.flows_list = [os.path.join(train_dir, f + '_flows.tif') for f in self.imgs]
             self.ids = list(range(len(self.img_list)))
-            print(self.imgs)
-            # print(self.img_list, self.masks_list, self.flows_list)
+            print(self.img_list, self.masks_list, self.flows_list, sep='\n')
         else:
             pass
         #     # inference mode
