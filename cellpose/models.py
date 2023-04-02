@@ -686,7 +686,7 @@ class CellposeModel(UnetModel):
         return loss        
 
 
-    def _train_net(self, save_path=None, save_every=100, save_each=False, learning_rate=0.2, n_epochs=500, momentum=0.9, weight_decay=0.00001, 
+    def _train_net(self, save_path=None, save_every=100, save_each=False, learning_rate=0.2, n_epochs=500, momentum=0.9, weight_decay=0.00001, patience=20,
                    SGD=True, batch_size=8, nimg_per_epoch=None, rescale=True, model_name=None): 
         """ train function uses loss function self.loss_fn in models.py"""
         
@@ -728,7 +728,6 @@ class CellposeModel(UnetModel):
         # compute average cell diameter
         diam_train = np.array([utils.diameters(tr_ds.load_raw(k)[1][0])[0] for k in range(len(tr_ds))])
         diam_train_mean = diam_train[diam_train > 0].mean()
-        print(diam_train)
         self.diam_labels = diam_train_mean
         if rescale:
             diam_train[diam_train<5] = 5.
@@ -768,7 +767,7 @@ class CellposeModel(UnetModel):
             models_logger.warning('WARNING: no save_path given, model not saving')
 
         ksave = 0
-        rsc = 1.0
+        # rsc = 1.0
 
         # cannot train with mkldnn
         self.net.mkldnn = False
@@ -784,6 +783,7 @@ class CellposeModel(UnetModel):
             inds_all = np.hstack((inds_all, rperm))
             
         lmin = 1000
+        min_epoch = 0
         save = False
         
         tr_ds.set_train_params(diam_mean=self.diam_mean, scale_range=scale_range, rescale=rescale, unet=self.unet)
@@ -821,6 +821,7 @@ class CellposeModel(UnetModel):
             # t_tr_loader.set_postfix({'loss': lavg, 'lr': self.learning_rate[iepoch]})
             if lmin > lavg:
                 lmin = lavg
+                min_epoch = iepoch
                 save = True
             lavg, nsum = 0, 0
                             
@@ -841,17 +842,20 @@ class CellposeModel(UnetModel):
                             file_name = model_name
                     file_name = os.path.join(file_path, file_name)
                     ksave += 1
-                    # models_logger.info(f'saving network parameters to {file_name}')
+                    models_logger.info(f'saving network parameters to {file_name}')
                     self.net.save_model(file_name)
                     save = False
             else:
                 file_name = save_path
+                
+            if (iepoch - min_epoch) > patience:
+                break
 
         # reset to mkldnn if available
         self.net.mkldnn = self.mkldnn
         return file_name
 
-    def train(self, save_path=None, save_every=100, save_each=False, learning_rate=0.2, n_epochs=500, 
+    def train(self, save_path=None, save_every=100, save_each=False, learning_rate=0.2, n_epochs=500, patience=20,
               momentum=0.9, SGD=True,weight_decay=0.00001, batch_size=8, nimg_per_epoch=None, model_name=None):
 
         """ train network with images train_data 
@@ -945,7 +949,7 @@ class CellposeModel(UnetModel):
         #     models_logger.warning('channels is set to None, input must therefore have nchan channels (default is 2)')
         model_path = self._train_net(save_path=save_path, save_every=save_every, save_each=save_each,
                                      learning_rate=learning_rate, n_epochs=n_epochs, 
-                                     momentum=momentum, weight_decay=weight_decay, 
+                                     momentum=momentum, weight_decay=weight_decay, patience=patience,
                                      SGD=SGD, batch_size=batch_size, nimg_per_epoch=nimg_per_epoch, model_name=model_name)
         self.pretrained_model = model_path
         return model_path
