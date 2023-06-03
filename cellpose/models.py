@@ -788,10 +788,13 @@ class CellposeModel(UnetModel):
         
         tr_ds.set_train_params(diam_mean=self.diam_mean, scale_range=scale_range, rescale=rescale, unet=self.unet)
         
+        
         for iepoch in range(self.n_epochs):
             if SGD:
                 self._set_learning_rate(self.learning_rate[iepoch])
-            for imgi, lbl in tr_loader:
+                
+            tqdm_out = utils.TqdmToLogger(models_logger, level=logging.INFO)
+            for imgi, lbl in tqdm(tr_loader, file=tqdm_out, desc=f'Epoch {iepoch}/{self.n_epochs}:'):
                 train_loss = self._train_step(imgi, lbl)
                 lavg += train_loss
                 nsum += len(imgi) 

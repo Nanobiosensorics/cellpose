@@ -20,28 +20,13 @@ class CellDataset(Dataset):
         self.scale_range = 1.0
         self.rescale = True
         self.unet = False
-
-        if self.train:
-            train_dir = os.path.join(data_dir, 'train')
-            # if load_seg:
-            #     self.seg_list = [os.path.join(train_dir, f) for f in os.listdir(train_dir) if f.endswith('_seg.npy')]
-            #     print(self.seg_list)
-            # # else:
-            self.imgs = [f[:-4] for f in os.listdir(train_dir) if f.endswith('png')]
-            self.img_list = [os.path.join(train_dir, f + '.png') for f in self.imgs]
-            self.masks_list = [os.path.join(train_dir, f + mask_filter) for f in self.imgs]
-            self.flows_list = [os.path.join(train_dir, f + '_flows.tif') for f in self.imgs]
-            self.ids = list(range(len(self.img_list)))
-            print(self.img_list, self.masks_list, self.flows_list, sep='\n')
-        else:
-            pass
-        #     # inference mode
-        #     self.anno_path = os.path.join(data_dir, 'val/annotation.json')
-        #     self.img_dir = os.path.join(data_dir, 'val/images')
-        #     self.imgs_list = [f for f in os.listdir(self.data_dir) if f.endswith(('png', 'tif', 'jpg'))]
-        #     self.ids = range(len(self.imgs_list))
-        #     if not self.imgs_list:
-        #         raise FileNotFoundError
+        
+        self.imgs = [f[:-4] for f in os.listdir(data_dir) if f.endswith(('png', 'jpg', 'tif'))]
+        self.img_list = [os.path.join(data_dir, f) for f in os.listdir(data_dir) if f.endswith(('png', 'jpg', 'tif'))]
+        self.masks_list = [os.path.join(data_dir, f + mask_filter) for f in self.imgs]
+        self.flows_list = [os.path.join(data_dir, f + '_flows.tif') for f in self.imgs]
+        self.ids = list(range(len(self.img_list)))
+        print(self.img_list, self.masks_list, self.flows_list, sep='\n')
         
     def set_train_params(self, diam_mean=30, scale_range=1.0, rescale=True, unet=False):
         self.diam_mean=diam_mean
