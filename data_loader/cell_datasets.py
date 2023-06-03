@@ -26,7 +26,7 @@ class CellDataset(Dataset):
         self.masks_list = [os.path.join(data_dir, f + mask_filter) for f in self.imgs]
         self.flows_list = [os.path.join(data_dir, f + '_flows.tif') for f in self.imgs]
         self.ids = list(range(len(self.img_list)))
-        print(self.img_list, self.masks_list, self.flows_list, sep='\n')
+        print(len(self.img_list))
         
     def set_train_params(self, diam_mean=30, scale_range=1.0, rescale=True, unet=False):
         self.diam_mean=diam_mean
