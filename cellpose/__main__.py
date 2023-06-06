@@ -4,6 +4,7 @@ from natsort import natsorted
 from tqdm import tqdm
 from cellpose import utils, models, io, core, version_str
 from cellpose.cli import get_arg_parser
+from data_loader import CellDataset
 
 try:
     from cellpose.gui import gui 
@@ -184,12 +185,17 @@ def main():
         else:
             
             test_dir = None if len(args.test_dir)==0 else args.test_dir
-            output = io.load_train_test_data(args.dir, test_dir, imf, args.mask_filter, args.unet, args.look_one_level_down)
-            images, labels, image_names, test_images, test_labels, image_names_test = output
+            # output = io.load_train_test_data(args.dir, test_dir, imf, args.mask_filter, args.unet, args.look_one_level_down)
+            # images, labels, image_names, test_images, test_labels, image_names_test = output
+            
+            train_dataset = CellDataset(args.dir, train=True, channels=[args.chan, args.chan2], mask_filter=args.mask_filter, imf=imf, look_one_level_down=args.look_one_level_down)
 
+            if test_dir != None:
+                test_dataset = CellDataset(test_dir, train=False, channels=[args.chan, args.chan2], mask_filter=args.mask_filter, imf=imf, look_one_level_down=args.look_one_level_down)
+            
             # training with all channels
             if args.all_channels:
-                img = images[0]
+                img = train_dataset.get_image(0)
                 if img.ndim==3:
                     nchan = min(img.shape)
                 elif img.ndim==2:
@@ -234,8 +240,7 @@ def main():
             
             # train segmentation model
             if args.train:
-                cpmodel_path = model.train(images, labels, train_files=image_names,
-                                           test_data=test_images, test_labels=test_labels, test_files=image_names_test,
+                cpmodel_path = model.train(train_dataset, test_dataset,
                                            learning_rate=args.learning_rate, 
                                            weight_decay=args.weight_decay,
                                            channels=channels,

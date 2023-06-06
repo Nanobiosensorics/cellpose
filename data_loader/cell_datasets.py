@@ -9,24 +9,19 @@ import torchvision.transforms as T
 
 
 class CellDataset(Dataset):
-    def __init__(self, data_dir, channels=[0,0], load_seg=False, train=True, mask_filter='_seg.npy'):
+    def __init__(self, dir, train=True, channels=[0,0], mask_filter='_seg.npy', imf=None, look_one_level_down=False):
         super().__init__()
         self.ids = []
-        self.channels = channels
         self.train = train
-        self.data_dir = data_dir
+        self.channels = channels
         self.seg_list = None
         self.diam_mean = 30
         self.scale_range = 1.0
         self.rescale = True
         self.unet = False
-        
-        self.imgs = [f[:-4] for f in os.listdir(data_dir) if f.endswith(('png', 'jpg', 'tif'))]
-        self.img_list = [os.path.join(data_dir, f) for f in os.listdir(data_dir) if f.endswith(('png', 'jpg', 'tif'))]
-        self.masks_list = [os.path.join(data_dir, f + mask_filter) for f in self.imgs]
-        self.flows_list = [os.path.join(data_dir, f + '_flows.tif') for f in self.imgs]
-        self.ids = list(range(len(self.img_list)))
-        print(len(self.img_list))
+        self.image_names = io.get_image_files(dir, mask_filter, imf=imf, look_one_level_down=look_one_level_down)
+        self.label_names, self.flow_names = io.get_label_files(self.image_names, mask_filter, imf=imf)
+        self.ids = list(range(len(self.image_names)))
         
     def set_train_params(self, diam_mean=30, scale_range=1.0, rescale=True, unet=False):
         self.diam_mean=diam_mean
@@ -64,8 +59,14 @@ class CellDataset(Dataset):
         return len(self.ids)
 
     def get_image(self, img_id):
-        image = io.imread(self.img_list[img_id])
+        image = io.imread(self.image_names[img_id])
         return [ image ]
+    
+    def get_image_files(self):
+        return self.image_names
+    
+    def get_label_files(self):
+        return self.label_names, self.flow_names
 
     @staticmethod
     def convert_to_xyxy(box):
@@ -79,14 +80,14 @@ class CellDataset(Dataset):
     def get_target(self, img_id):
         # return target.shape: [4, Ly, Lx]
         # target[0] is masks, target[1] is cell_probability, target[2] is flow Y, target[3] is flow X.Q
-        if os.path.exists(self.flows_list[img_id]):
-            masks = io.imread(self.flows_list[img_id])
+        if self.flow_names != None:
+            masks = io.imread(self.flow_names[img_id])
         else:
-            masks = io.imread(self.masks_list[img_id])
+            masks = io.imread(self.label_names[img_id])
             masks = self.mask_convert(masks)
 
         # mask to flows, flows.shape: list of [4 x Ly x Lx] arrays
-        flows = dynamics.labels_to_flows([masks], files=[self.img_list[img_id]])
+        flows = dynamics.labels_to_flows([masks], files=[self.image_names[img_id]])
         target = flows[0]
         return [target]
 

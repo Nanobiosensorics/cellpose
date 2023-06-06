@@ -11,6 +11,8 @@ models_logger = logging.getLogger(__name__)
 from . import transforms, dynamics, utils, plot
 from .core import UnetModel, assign_device, check_mkl, parse_model_string
 
+from data_loader import CellDataLoader
+
 _MODEL_URL = 'https://www.cellpose.org/models'
 _MODEL_DIR_ENV = os.environ.get("CELLPOSE_LOCAL_MODELS_PATH")
 _MODEL_DIR_DEFAULT = pathlib.Path.home().joinpath('.cellpose', 'models')
@@ -308,7 +310,7 @@ class CellposeModel(UnetModel):
     
     """
     
-    def __init__(self, train_loader, valid_loader=None, gpu=False, pretrained_model=False, 
+    def __init__(self, gpu=False, pretrained_model=False, 
                     model_type=None, net_avg=False,
                     diam_mean=30., device=None,
                     residual_on=True, style_on=True, concatenation=False,
@@ -321,9 +323,6 @@ class CellposeModel(UnetModel):
     
         self.diam_mean = diam_mean
         builtin = True
-        
-        self.train_loader = train_loader
-        self.valid_loader = valid_loader
 
         if model_type is not None or (pretrained_model and not os.path.exists(pretrained_model[0])):
             pretrained_model_string = model_type if model_type is not None else 'cyto'
@@ -686,15 +685,15 @@ class CellposeModel(UnetModel):
         return loss        
 
 
-    def _train_net(self, save_path=None, save_every=100, save_each=False, learning_rate=0.2, n_epochs=500, momentum=0.9, weight_decay=0.00001, patience=20,
+    def _train_net(self, train_dataset, test_dataset=None, save_path=None, save_every=100, save_each=False, learning_rate=0.2, n_epochs=500, momentum=0.9, weight_decay=0.00001, patience=20,
                    SGD=True, batch_size=8, nimg_per_epoch=None, rescale=True, model_name=None): 
         """ train function uses loss function self.loss_fn in models.py"""
-        
         d = datetime.datetime.now()
-        tr_ds = self.train_loader.dataset
-        tr_loader = self.train_loader
-        # val_ds = self.valid_loader.dataset
-        # val_loader = self.valid_loader
+        tr_loader = CellDataLoader(train_dataset, batch_size, True)
+        tr_ds = tr_loader.dataset
+        if test_dataset != None:
+            tst_loader = CellDataLoader(test_dataset, batch_size, True)
+            tst_ds = tst_loader.dataset
         
         self.n_epochs = n_epochs
         if isinstance(learning_rate, (list, np.ndarray)):
@@ -742,7 +741,7 @@ class CellposeModel(UnetModel):
         models_logger.info(f'>>>> mean of training label mask diameters (saved to model) {diam_train_mean:.3f}')
         self.net.diam_labels.data = torch.ones(1, device=self.device) * diam_train_mean
 
-        nchan = tr_ds[0][0].shape[0]
+        nchan = self.nchan
         models_logger.info('>>>> training network with %d channel input <<<<'%nchan)
         models_logger.info('>>>> LR: %0.5f, batch_size: %d, weight_decay: %0.5f'%(self.learning_rate_const, self.batch_size, weight_decay))
         
@@ -787,7 +786,6 @@ class CellposeModel(UnetModel):
         save = False
         
         tr_ds.set_train_params(diam_mean=self.diam_mean, scale_range=scale_range, rescale=rescale, unet=self.unet)
-        
         
         for iepoch in range(self.n_epochs):
             if SGD:
@@ -858,7 +856,7 @@ class CellposeModel(UnetModel):
         self.net.mkldnn = self.mkldnn
         return file_name
 
-    def train(self, save_path=None, save_every=100, save_each=False, learning_rate=0.2, n_epochs=500, patience=20,
+    def train(self, train_dataset, test_dataset=None, save_path=None, save_every=100, save_each=False, learning_rate=0.2, n_epochs=500, patience=20,
               momentum=0.9, SGD=True,weight_decay=0.00001, batch_size=8, nimg_per_epoch=None, model_name=None):
 
         """ train network with images train_data 
@@ -950,7 +948,7 @@ class CellposeModel(UnetModel):
 
         # if channels is None:
         #     models_logger.warning('channels is set to None, input must therefore have nchan channels (default is 2)')
-        model_path = self._train_net(save_path=save_path, save_every=save_every, save_each=save_each,
+        model_path = self._train_net(train_dataset, test_dataset=test_dataset, save_path=save_path, save_every=save_every, save_each=save_each,
                                      learning_rate=learning_rate, n_epochs=n_epochs, 
                                      momentum=momentum, weight_decay=weight_decay, patience=patience,
                                      SGD=SGD, batch_size=batch_size, nimg_per_epoch=nimg_per_epoch, model_name=model_name)

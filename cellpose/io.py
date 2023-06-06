@@ -224,7 +224,7 @@ def get_label_files(image_names, mask_filter, imf=None):
     # check for masks
     if mask_filter =='_seg.npy':
         label_names = [label_names[n] + mask_filter for n in range(nimg)]
-        return label_names, None
+        return label_names, flow_names
 
     if os.path.exists(label_names[0] + mask_filter + '.tif'):
         label_names = [label_names[n] + mask_filter + '.tif' for n in range(nimg)]
