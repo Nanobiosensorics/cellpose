@@ -8,7 +8,8 @@ install_deps = ['numpy>=1.20.0', 'scipy', 'natsort',
                 'torch>=1.6',
                 'opencv-python-headless',
                 'fastremap',
-                'imagecodecs'
+                'imagecodecs',
+                'roifile',
                 ]
 
 gui_deps = [
@@ -17,13 +18,14 @@ gui_deps = [
         'pyqt5.sip',
         'superqt',
         'google-cloud-storage'
-        ]
+]
 
 docs_deps = [
         'sphinx>=3.0',
         'sphinxcontrib-apidoc',
         'sphinx_rtd_theme',
-      ]
+        'sphinx-argparse',
+]
 
 distributed_deps = [
         'dask',
