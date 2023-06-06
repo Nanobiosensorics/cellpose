@@ -190,6 +190,7 @@ def main():
             
             train_dataset = CellDataset(args.dir, train=True, channels=[args.chan, args.chan2], mask_filter=args.mask_filter, imf=imf, look_one_level_down=args.look_one_level_down)
 
+            test_dataset = None
             if test_dir != None:
                 test_dataset = CellDataset(test_dir, train=False, channels=[args.chan, args.chan2], mask_filter=args.mask_filter, imf=imf, look_one_level_down=args.look_one_level_down)
             
@@ -243,12 +244,10 @@ def main():
                 cpmodel_path = model.train(train_dataset, test_dataset,
                                            learning_rate=args.learning_rate, 
                                            weight_decay=args.weight_decay,
-                                           channels=channels,
                                            save_path=os.path.realpath(args.dir), save_every=args.save_every,
                                            save_each=args.save_each,
                                            n_epochs=args.n_epochs,
-                                           batch_size=args.batch_size, 
-                                           min_train_masks=args.min_train_masks)
+                                           batch_size=args.batch_size)
                 model.pretrained_model = cpmodel_path
                 logger.info('>>>> model trained and saved to %s'%cpmodel_path)
 
