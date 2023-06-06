@@ -689,6 +689,14 @@ class MainW(QMainWindow):
         self.ScaleOn.setToolTip('see current diameter as red disk at bottom')
         self.ScaleOn.toggled.connect(self.toggle_scale)
         self.l0.addWidget(self.ScaleOn, b,0,1,4)
+        
+        self.save_minimal = False
+        self.saveMin = QCheckBox('save minimal')
+        self.saveMin.setStyleSheet(self.checkstyle)
+        self.saveMin.setFont(self.medfont)
+        self.saveMin.setToolTip('save minimal to _seg.npy')
+        self.saveMin.toggled.connect(self.toggle_masks_save)
+        self.l0.addWidget(self.saveMin, b, 0,8,4)
 
         # add scrollbar underneath
         self.scroll = QScrollBar(QtCore.Qt.Horizontal)
@@ -928,7 +936,9 @@ class MainW(QMainWindow):
         if self.loaded:
             self.update_plot()
             self.update_layer()
-
+            
+    def toggle_masks_save(self):
+        self.save_minimal = self.saveMin.isChecked()
 
     def move_in_Z(self):
         if self.loaded:

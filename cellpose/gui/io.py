@@ -478,19 +478,25 @@ def _save_sets(parent):
     filename = parent.filename
     base = os.path.splitext(filename)[0]
     flow_threshold, cellprob_threshold = parent.get_thresholds()
-    if parent.NZ > 1 and parent.is_stack:
+    if parent.save_minimal:
+        print(f'Saving to {base}_seg.npy')
         np.save(base + '_seg.npy',
                 {'outlines': parent.outpix,
-                 'colors': parent.cellcolors[1:],
-                 'masks': parent.cellpix,
-                 'current_channel': (parent.color-2)%5,
-                 'filename': parent.filename,
-                 'flows': parent.flows,
-                 'zdraw': parent.zdraw,
-                 'model_path': parent.current_model_path if hasattr(parent, 'current_model_path') else 0,
-                 'flow_threshold': flow_threshold,
-                 'cellprob_threshold': cellprob_threshold
-                 })
+                'masks': parent.cellpix
+                })
+    elif parent.NZ > 1 and parent.is_stack:
+        np.save(base + '_seg.npy',
+                {'outlines': parent.outpix,
+                'colors': parent.cellcolors[1:],
+                'masks': parent.cellpix,
+                'current_channel': (parent.color-2)%5,
+                'filename': parent.filename,
+                'flows': parent.flows,
+                'zdraw': parent.zdraw,
+                'model_path': parent.current_model_path if hasattr(parent, 'current_model_path') else 0,
+                'flow_threshold': flow_threshold,
+                'cellprob_threshold': cellprob_threshold
+                })
     else:
         image = parent.chanchoose(parent.stack[parent.currentZ].copy())
         if image.ndim < 4:
