@@ -233,7 +233,7 @@ class UnetModel():
         masks = []
         if rescale is None:
             rescale = np.ones(nimg)
-        elif isinstance(rescale, float):
+        elif isinstance(rescale, np.float32):
             rescale = rescale * np.ones(nimg)
         if nimg > 1:
             iterator = trange(nimg, file=tqdm_out)
@@ -298,6 +298,8 @@ class UnetModel():
         return masks, flows, styles
 
     def _to_device(self, x):
+        if type(x) == np.ndarray:
+            x = torch.from_numpy(x)
         X = x.float().to(self.device)
         return X
 
