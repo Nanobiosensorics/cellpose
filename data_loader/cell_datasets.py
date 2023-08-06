@@ -19,9 +19,25 @@ class CellDataset(Dataset):
         self.scale_range = 1.0
         self.rescale = True
         self.unet = False
-        self.image_names = io.get_image_files(dir, mask_filter, imf=imf, look_one_level_down=look_one_level_down)
-        self.label_names, self.flow_names = io.get_label_files(self.image_names, mask_filter, imf=imf)
-        self.ids = list(range(len(self.image_names)))
+        
+        if type(dir) == list:
+            self.image_names = []
+            self.label_names = []
+            self.flow_names = []
+            for path in dir:
+                image_names = io.get_image_files(path, mask_filter, imf=imf, look_one_level_down=look_one_level_down)
+                label_names, flow_names = io.get_label_files(image_names, mask_filter, imf=imf)
+                self.image_names.extend(image_names)
+                self.label_names.extend(label_names)
+                if flow_names != None:
+                    self.flow_names.extend(flow_names)
+            if len(self.flow_names) == 0:
+                self.flow_names = None
+            self.ids = list(range(len(self.image_names)))
+        else:
+            self.image_names = io.get_image_files(dir, mask_filter, imf=imf, look_one_level_down=look_one_level_down)
+            self.label_names, self.flow_names = io.get_label_files(self.image_names, mask_filter, imf=imf)
+            self.ids = list(range(len(self.image_names)))
         
     def set_train_params(self, diam_mean=30, scale_range=1.0, rescale=True, unet=False):
         self.diam_mean=diam_mean
