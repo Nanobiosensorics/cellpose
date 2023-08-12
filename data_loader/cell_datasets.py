@@ -4,14 +4,13 @@ from torch.utils.data import Dataset
 from cellpose import dynamics, transforms, io, utils
 
 class CellDataset(Dataset):
-    def __init__(self, dir, train=True, channels=[0,0], mask_filter='_seg.npy', imf=None, look_one_level_down=False):
+    def __init__(self, dir, train=True, channels=[0,0], mask_filter='_seg.npy', imf=None, look_one_level_down=False, generate_flows=False):
         super().__init__()
         self.ids = []
         self.train = train
         self.channels = channels
-        self.seg_list = None
         self.diam_mean = 30
-        self.scale_range = 1.0
+        self.scale_range = 0.5
         self.rescale = True
         self.unet = False
         self.image_names = []
@@ -23,16 +22,16 @@ class CellDataset(Dataset):
         
         for path in dir:
             image_names = io.get_image_files(path, mask_filter, imf=imf, look_one_level_down=look_one_level_down)
-            label_names, flow_names = io.get_label_files(image_names, mask_filter, imf=imf)
-            
-            if len(label_names) != len(flow_names):
-                self.generate_flows(image_names, label_names, flow_names)
-                label_names, flow_names = io.get_label_files(image_names, mask_filter, imf=imf)
-                
             self.image_names.extend(image_names)
-            self.label_names.extend(label_names)
-            self.flow_names.extend(flow_names)
             
+        label_names, flow_names = io.get_label_files(self.image_names, mask_filter, imf=imf)
+        
+        if len(label_names) != len(flow_names) and generate_flows:
+            self.generate_flows(self.image_names, label_names, flow_names)
+            label_names, flow_names = io.get_label_files(self.image_names, mask_filter, imf=imf)
+            
+        self.label_names.extend(label_names)
+        self.flow_names.extend(flow_names)
         self.ids = list(range(len(self.image_names)))
         
     def set_train_params(self, diam_mean=30, scale_range=1.0, rescale=True, unet=False):
@@ -55,7 +54,6 @@ class CellDataset(Dataset):
             return image, pre_info
 
     def __getitem__(self, img_id):
-        print(f"getitem {self.image_names[img_id]}")
         if self.train:
             # image
             image = self.get_image(img_id)
@@ -106,7 +104,7 @@ class CellDataset(Dataset):
             masks = self.mask_convert(masks)
 
         # mask to flows, flows.shape: list of [4 x Ly x Lx] arrays
-        flows = dynamics.labels_to_flows([masks], files=[self.image_names[img_id]], use_gpu=True)
+        flows = dynamics.labels_to_flows([masks], use_gpu=True)
         target = flows[0]
         return [target]
 
