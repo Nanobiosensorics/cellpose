@@ -142,10 +142,7 @@ class CellDataset(Dataset):
             return tr[0], label[0]
         # step2: random rotate and resize
         if self.train and label is not None:
-            diam = utils.diameters(label[0][0])[0]
-            if self.rescale and diam > 5:
-                diam = 5
-            rsc = diam / self.diam_mean if self.rescale else 1.0
+            rsc = utils.diameters(label[0][0])[0] / self.diam_mean if self.rescale else 1.0
             img, label, _ = transforms.random_rotate_and_resize(tr, [label[0][1:]], scale_range=self.scale_range, rescale=[rsc], unet=self.unet)
             img, label = map(torch.from_numpy, [img, label])
             return torch.squeeze(img), torch.squeeze(label)

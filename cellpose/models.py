@@ -693,10 +693,10 @@ class CellposeModel(UnetModel):
                    SGD=True, batch_size=8, nimg_per_epoch=None, rescale=True, model_name=None): 
         """ train function uses loss function self.loss_fn in models.py"""
         d = datetime.datetime.now()
-        tr_loader = CellDataLoader(train_dataset, batch_size, True)
+        tr_loader = CellDataLoader(train_dataset, batch_size, True, num_workers=0)
         tr_ds = tr_loader.dataset
         if test_dataset != None:
-            tst_loader = CellDataLoader(test_dataset, batch_size, True)
+            tst_loader = CellDataLoader(test_dataset, batch_size, True, num_workers=0)
             tst_ds = tst_loader.dataset
         
         self.n_epochs = n_epochs
@@ -776,7 +776,7 @@ class CellposeModel(UnetModel):
         save = False
         
         tr_ds.set_train_params(diam_mean=self.diam_mean, scale_range=scale_range, rescale=rescale, unet=self.unet)
-        tst_ds.set_train_params(diam_mean=self.diam_mean, scale_range=scale_range, rescale=rescale, unet=self.unet)
+        tst_ds.set_train_params(diam_mean=self.diam_mean, scale_range=0, rescale=rescale, unet=self.unet)
         
         for iepoch in range(self.n_epochs):
             if SGD:
@@ -787,7 +787,8 @@ class CellposeModel(UnetModel):
             for imgi, lbl in tqdm(tr_loader, file=tqdm_out, desc=f'Epoch {iepoch}/{self.n_epochs}:'):
                 train_loss = self._train_step(imgi, lbl)
                 lavg += train_loss
-                nsum += len(imgi) 
+                nsum += len(imgi)
+                del imgi, lbl
 
             lavg = lavg / nsum
             if test_dataset is not None:
@@ -797,6 +798,7 @@ class CellposeModel(UnetModel):
                     train_loss = self._train_step(imgi, lbl)
                     lavgt += train_loss
                     nsum += len(imgi) 
+                    del imgi, lbl
 
 
                 models_logger.info('Epoch %d, Time %4.1fs, Loss %2.4f, Loss Test %2.4f, LR %2.4f'%
