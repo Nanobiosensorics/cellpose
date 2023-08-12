@@ -223,7 +223,7 @@ def get_label_files(image_names, mask_filter, imf=None):
         flow_names = [label_names[n] + '_flows.tif' for n in range(nimg)]
     if not all([os.path.exists(flow) for flow in flow_names]):
         io_logger.info('not all flows are present, running flow generation for all images')
-        flow_names = None
+        flow_names = []
     
     # check for masks
     if mask_filter =='_seg.npy':

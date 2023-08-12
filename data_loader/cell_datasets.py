@@ -18,19 +18,22 @@ class CellDataset(Dataset):
         self.label_names = []
         self.flow_names = []
         
-        if type(dir) == list:
-            for path in dir:
-                image_names = io.get_image_files(path, mask_filter, imf=imf, look_one_level_down=look_one_level_down)
+        if type(dir) == str:
+            dir = [dir]
+        
+        for path in dir:
+            image_names = io.get_image_files(path, mask_filter, imf=imf, look_one_level_down=look_one_level_down)
+            label_names, flow_names = io.get_label_files(image_names, mask_filter, imf=imf)
+            
+            if len(label_names) != len(flow_names):
+                self.generate_flows(image_names, label_names, flow_names)
                 label_names, flow_names = io.get_label_files(image_names, mask_filter, imf=imf)
-                self.image_names.extend(image_names)
-                self.label_names.extend(label_names)
-                if flow_names != None:
-                    self.flow_names.extend(flow_names)
-            self.ids = list(range(len(self.image_names)))
-        else:
-            self.image_names = io.get_image_files(dir, mask_filter, imf=imf, look_one_level_down=look_one_level_down)
-            self.label_names, self.flow_names = io.get_label_files(self.image_names, mask_filter, imf=imf)
-            self.ids = list(range(len(self.image_names)))
+                
+            self.image_names.extend(image_names)
+            self.label_names.extend(label_names)
+            self.flow_names.extend(flow_names)
+            
+        self.ids = list(range(len(self.image_names)))
         
     def set_train_params(self, diam_mean=30, scale_range=1.0, rescale=True, unet=False):
         self.diam_mean=diam_mean
@@ -52,6 +55,7 @@ class CellDataset(Dataset):
             return image, pre_info
 
     def __getitem__(self, img_id):
+        print(f"getitem {self.image_names[img_id]}")
         if self.train:
             # image
             image = self.get_image(img_id)
@@ -85,6 +89,12 @@ class CellDataset(Dataset):
         new_box[:, 2] = box[:, 0] + box[:, 2]
         new_box[:, 3] = box[:, 1] + box[:, 3]
         return new_box # new_box format: (xmin, ymin, xmax, ymax)
+    
+    def generate_flows(self, image_names, label_names, flow_names, use_gpu=True):
+        for image_name, label_name in zip(image_names[len(flow_names):], label_names[len(flow_names):]):
+            masks = io.imread(label_name)
+            masks = self.mask_convert(masks)
+            dynamics.labels_to_flows([masks], files=[image_name], use_gpu=use_gpu)
 
     def get_target(self, img_id):
         # return target.shape: [4, Ly, Lx]
