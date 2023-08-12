@@ -752,8 +752,6 @@ class CellposeModel(UnetModel):
         
         tic = time.time()
 
-        lavg, nsum = 0, 0
-
         if save_path is not None:
             _, file_label = os.path.split(save_path)
             file_path = os.path.join(save_path, 'models/')
@@ -784,6 +782,7 @@ class CellposeModel(UnetModel):
             if SGD:
                 self._set_learning_rate(self.learning_rate[iepoch])
                 
+            lavg, nsum = 0, 0
             tqdm_out = utils.TqdmToLogger(models_logger, level=logging.INFO)
             for imgi, lbl in tqdm(tr_loader, file=tqdm_out, desc=f'Epoch {iepoch}/{self.n_epochs}:'):
                 train_loss = self._train_step(imgi, lbl)
@@ -802,14 +801,19 @@ class CellposeModel(UnetModel):
 
                 models_logger.info('Epoch %d, Time %4.1fs, Loss %2.4f, Loss Test %2.4f, LR %2.4f'%
                         (iepoch, time.time()-tic, lavg, lavgt/nsum, self.learning_rate[iepoch]))
+                
+                if lmin > lavgt:
+                    lmin = lavgt
+                    min_epoch = iepoch
+                    save = True
+                    
             else:
                 models_logger.info('Epoch %d, Time %4.1fs, Loss %2.4f, LR %2.4f' % (iepoch, time.time()-tic, lavg, self.learning_rate[iepoch]))
             # t_tr_loader.set_postfix({'loss': lavg, 'lr': self.learning_rate[iepoch]})
-            if lmin > lavg:
-                lmin = lavg
-                min_epoch = iepoch
-                save = True
-            lavg, nsum = 0, 0
+                if lmin > lavg:
+                    lmin = lavg
+                    min_epoch = iepoch
+                    save = True
                             
             if save_path is not None:
                 if save:
