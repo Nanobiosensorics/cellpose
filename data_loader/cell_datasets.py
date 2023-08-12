@@ -1,12 +1,7 @@
-from PIL import Image
-import os
 import numpy as np
 import torch
 from torch.utils.data import Dataset
-from cellpose import dynamics, plot, transforms, io, utils
-import torchvision.transforms as T
-# from pycocotools.coco import COCO
-
+from cellpose import dynamics, transforms, io, utils
 
 class CellDataset(Dataset):
     def __init__(self, dir, train=True, channels=[0,0], mask_filter='_seg.npy', imf=None, look_one_level_down=False):
@@ -19,11 +14,11 @@ class CellDataset(Dataset):
         self.scale_range = 1.0
         self.rescale = True
         self.unet = False
+        self.image_names = []
+        self.label_names = []
+        self.flow_names = []
         
         if type(dir) == list:
-            self.image_names = []
-            self.label_names = []
-            self.flow_names = []
             for path in dir:
                 image_names = io.get_image_files(path, mask_filter, imf=imf, look_one_level_down=look_one_level_down)
                 label_names, flow_names = io.get_label_files(image_names, mask_filter, imf=imf)
@@ -31,8 +26,6 @@ class CellDataset(Dataset):
                 self.label_names.extend(label_names)
                 if flow_names != None:
                     self.flow_names.extend(flow_names)
-            if len(self.flow_names) == 0:
-                self.flow_names = None
             self.ids = list(range(len(self.image_names)))
         else:
             self.image_names = io.get_image_files(dir, mask_filter, imf=imf, look_one_level_down=look_one_level_down)
@@ -96,20 +89,18 @@ class CellDataset(Dataset):
     def get_target(self, img_id):
         # return target.shape: [4, Ly, Lx]
         # target[0] is masks, target[1] is cell_probability, target[2] is flow Y, target[3] is flow X.Q
-        if self.flow_names != None:
+        if len(self.flow_names) > img_id:
             masks = io.imread(self.flow_names[img_id])
         else:
             masks = io.imread(self.label_names[img_id])
             masks = self.mask_convert(masks)
 
         # mask to flows, flows.shape: list of [4 x Ly x Lx] arrays
-        flows = dynamics.labels_to_flows([masks], files=[self.image_names[img_id]])
+        flows = dynamics.labels_to_flows([masks], files=[self.image_names[img_id]], use_gpu=True)
         target = flows[0]
         return [target]
 
     def transform(self, img, label=None, raw=False):
-        from time import time
-        start = time()
         # dataset argument
         # step1: reshape and normalize data
         tr, ts, rn = transforms.reshape_and_normalize_data(img, channels=self.channels, normalize=True)
@@ -117,7 +108,10 @@ class CellDataset(Dataset):
             return tr[0], label[0]
         # step2: random rotate and resize
         if self.train and label is not None:
-            rsc = utils.diameters(label[0][0])[0] / self.diam_mean if self.rescale else 1.0
+            diam = utils.diameters(label[0][0])[0]
+            if self.rescale and diam > 5:
+                diam = 5
+            rsc = diam / self.diam_mean if self.rescale else 1.0
             img, label, _ = transforms.random_rotate_and_resize(tr, [label[0][1:]], scale_range=self.scale_range, rescale=[rsc], unet=self.unet)
             img, label = map(torch.from_numpy, [img, label])
             return torch.squeeze(img), torch.squeeze(label)
