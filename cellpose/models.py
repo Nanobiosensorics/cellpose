@@ -733,10 +733,6 @@ class CellposeModel(UnetModel):
         diam_train_mean = diam_train[diam_train > 0].mean()
         self.diam_labels = diam_train_mean
         if rescale:
-            diam_train[diam_train<5] = 5.
-            # if val_ds is not None:
-            #     diam_test = np.array([utils.diameters(val_ds[k][1][0])[0] for k in range(len(val_ds))])
-            #     diam_test[diam_test<5] = 5.
             scale_range = 0.5
             models_logger.info('>>>> median diameter set to = %d'%self.diam_mean)
         else:
@@ -749,12 +745,10 @@ class CellposeModel(UnetModel):
         models_logger.info('>>>> training network with %d channel input <<<<'%nchan)
         models_logger.info('>>>> LR: %0.5f, batch_size: %d, weight_decay: %0.5f'%(self.learning_rate_const, self.batch_size, weight_decay))
         
-        # if val_ds is not None:
-        #     models_logger.info(f'>>>> ntrain = {nimg}, ntest = {len(val_ds)}')
-        # else:
-        #     models_logger.info(f'>>>> ntrain = {nimg}')
-        
-        models_logger.info(f'>>>> ntrain = {nimg}')
+        if test_dataset is not None:
+            models_logger.info(f'>>>> ntrain = {nimg}, ntest = {len(tst_ds)}')
+        else:
+            models_logger.info(f'>>>> ntrain = {nimg}')
         
         tic = time.time()
 
@@ -775,21 +769,16 @@ class CellposeModel(UnetModel):
         # cannot train with mkldnn
         self.net.mkldnn = False
 
-        # get indices for each epoch for training
-        np.random.seed(0)
-        inds_all = np.zeros((0,), 'int32')
         if nimg_per_epoch is None or nimg > nimg_per_epoch:
             nimg_per_epoch = nimg 
         models_logger.info(f'>>>> nimg_per_epoch = {nimg_per_epoch}')
-        while len(inds_all) < n_epochs * nimg_per_epoch:
-            rperm = np.random.permutation(nimg)
-            inds_all = np.hstack((inds_all, rperm))
             
         lmin = 1000
         min_epoch = 0
         save = False
         
         tr_ds.set_train_params(diam_mean=self.diam_mean, scale_range=scale_range, rescale=rescale, unet=self.unet)
+        tst_ds.set_train_params(diam_mean=self.diam_mean, scale_range=scale_range, rescale=rescale, unet=self.unet)
         
         for iepoch in range(self.n_epochs):
             if SGD:
@@ -802,27 +791,19 @@ class CellposeModel(UnetModel):
                 nsum += len(imgi) 
 
             lavg = lavg / nsum
-            # if test_data is not None:
-            #     lavgt, nsum = 0., 0
-            #     np.random.seed(42)
-            #     rperm = np.arange(0, len(test_data), 1, int)
-            #     for ibatch in range(0,len(test_data),batch_size):
-            #         inds = rperm[ibatch:ibatch+batch_size]
-            #         rsc = diam_test[inds] / self.diam_mean if rescale else np.ones(len(inds), np.float32)
-            #         imgi, lbl, scale = transforms.random_rotate_and_resize(
-            #                             [test_data[i] for i in inds], Y=[test_labels[i][1:] for i in inds], 
-            #                             scale_range=0., rescale=rsc, unet=self.unet) 
-            #         if self.unet and lbl.shape[1]>1 and rescale:
-            #             lbl[:,1] *= scale[:,np.newaxis,np.newaxis]**2
+            if test_dataset is not None:
+                lavgt, nsum = 0., 0
+                tqdm_out = utils.TqdmToLogger(models_logger, level=logging.INFO)
+                for imgi, lbl in tqdm(tst_loader, file=tqdm_out, desc=f'Epoch {iepoch}/{self.n_epochs}:'):
+                    train_loss = self._train_step(imgi, lbl)
+                    lavgt += train_loss
+                    nsum += len(imgi) 
 
-            #         test_loss = self._test_eval(imgi, lbl)
-            #         lavgt += test_loss
-            #         nsum += len(imgi)
 
-            #     models_logger.info('Epoch %d, Time %4.1fs, Loss %2.4f, Loss Test %2.4f, LR %2.4f'%
-            #             (iepoch, time.time()-tic, lavg, lavgt/nsum, self.learning_rate[iepoch]))
-            # else:
-            models_logger.info('Epoch %d, Time %4.1fs, Loss %2.4f, LR %2.4f' % (iepoch, time.time()-tic, lavg, self.learning_rate[iepoch]))
+                models_logger.info('Epoch %d, Time %4.1fs, Loss %2.4f, Loss Test %2.4f, LR %2.4f'%
+                        (iepoch, time.time()-tic, lavg, lavgt/nsum, self.learning_rate[iepoch]))
+            else:
+                models_logger.info('Epoch %d, Time %4.1fs, Loss %2.4f, LR %2.4f' % (iepoch, time.time()-tic, lavg, self.learning_rate[iepoch]))
             # t_tr_loader.set_postfix({'loss': lavg, 'lr': self.learning_rate[iepoch]})
             if lmin > lavg:
                 lmin = lavg
@@ -832,19 +813,7 @@ class CellposeModel(UnetModel):
                             
             if save_path is not None:
                 if save:
-                    # save model at the end
-                    if save_each: #separate files as model progresses 
-                        if model_name is None:
-                            file_name = '{}_{}_{}_{}'.format(self.net_type, file_label, 
-                                                             d.strftime("%Y_%m_%d_%H_%M_%S.%f"),
-                                                             'epoch_'+str(iepoch)) 
-                        else:
-                            file_name = '{}_{}'.format(model_name, 'epoch_'+str(iepoch))
-                    else:
-                        if model_name is None:
-                            file_name = '{}_{}_{}'.format(self.net_type, file_label, d.strftime("%Y_%m_%d_%H_%M_%S.%f"))
-                        else:
-                            file_name = model_name
+                    file_name = model_name
                     file_name = os.path.join(file_path, file_name)
                     ksave += 1
                     models_logger.info(f'saving network parameters to {file_name}')

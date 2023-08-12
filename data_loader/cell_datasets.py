@@ -3,8 +3,26 @@ import torch
 from torch.utils.data import Dataset
 from cellpose import dynamics, transforms, io, utils
 
+def split_dataset(dirs, test_split=0.2):
+    train_paths = []
+    test_paths = []
+    np.random.seed(0)
+    
+    for dir in set(map(lambda k: k[:-3], dirs)) :
+        sub_dirs = list(filter(lambda k: dir in k, dirs))
+        imgs = []
+        for pth in sub_dirs:
+            imgs.extend(io.get_image_files(pth, '_seg.npy'))    
+        idx_full = np.arange(len(imgs))
+        np.random.shuffle(idx_full)
+        idx = int((1 - test_split) * len(imgs))
+        train_paths.extend([imgs[i] for i in idx_full[:idx]])
+        test_paths.extend([imgs[i] for i in idx_full[idx:]])
+        
+    return train_paths, test_paths
+
 class CellDataset(Dataset):
-    def __init__(self, dir, train=True, channels=[0,0], mask_filter='_seg.npy', imf=None, look_one_level_down=False, generate_flows=False):
+    def __init__(self, dir=None, paths=None, train=True, channels=[0,0], mask_filter='_seg.npy', imf=None, look_one_level_down=False, generate_flows=False):
         super().__init__()
         self.ids = []
         self.train = train
@@ -17,13 +35,21 @@ class CellDataset(Dataset):
         self.label_names = []
         self.flow_names = []
         
-        if type(dir) == str:
-            dir = [dir]
+        if paths == None and dir == None:
+            print("Either dir or paths is mandatory at initialization!")
+            return
         
-        for path in dir:
-            image_names = io.get_image_files(path, mask_filter, imf=imf, look_one_level_down=look_one_level_down)
-            self.image_names.extend(image_names)
+        if dir != None:
+            if type(dir) == str:
+                dir = [dir]
             
+            for path in dir:
+                image_names = io.get_image_files(path, mask_filter, imf=imf, look_one_level_down=look_one_level_down)
+                self.image_names.extend(image_names)
+                
+        elif paths != None:
+            self.image_names = paths.copy()
+                
         label_names, flow_names = io.get_label_files(self.image_names, mask_filter, imf=imf)
         
         if len(label_names) != len(flow_names) and generate_flows:
@@ -35,7 +61,7 @@ class CellDataset(Dataset):
         self.ids = list(range(len(self.image_names)))
         
     def set_train_params(self, diam_mean=30, scale_range=1.0, rescale=True, unet=False):
-        self.diam_mean=diam_mean
+        self.diam_mean = diam_mean
         self.scale_range = scale_range
         self.rescale = rescale
         self.unet = unet
