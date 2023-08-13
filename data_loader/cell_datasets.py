@@ -30,10 +30,11 @@ class CellDataset(Dataset):
         self.diam_mean = 30
         self.scale_range = 0.5
         self.rescale = True
-        self.unet = False
+        self.unet = True
         self.image_names = []
         self.label_names = []
         self.flow_names = []
+        self.diam_scale = []
         
         if paths == None and dir == None:
             print("Either dir or paths is mandatory at initialization!")
@@ -60,7 +61,8 @@ class CellDataset(Dataset):
         self.flow_names.extend(flow_names)
         self.ids = list(range(len(self.image_names)))
         
-    def set_train_params(self, diam_mean=30, scale_range=1.0, rescale=True, unet=False):
+    def set_train_params(self, diam_scale, diam_mean=30, scale_range=1.0, rescale=True, unet=True):
+        self.diam_scale = diam_scale
         self.diam_mean = diam_mean
         self.scale_range = scale_range
         self.rescale = rescale
@@ -72,11 +74,11 @@ class CellDataset(Dataset):
             image = self.get_image(img_id)
             # label
             target = self.get_target(img_id) if self.train else {}
-            image, target = self.transform(image, target, raw=True)
+            image, target = self.transform(img_id, image, target, raw=True)
             return image, target
         else:
             image = self.get_image(img_id)
-            image, pre_info = self.transform(image, raw=True)
+            image, pre_info = self.transform(img_id, image, raw=True)
             return image, pre_info
 
     def __getitem__(self, img_id):
@@ -85,11 +87,11 @@ class CellDataset(Dataset):
             image = self.get_image(img_id)
             # label
             target = self.get_target(img_id) if self.train else {}
-            image, target = self.transform(image, target)
+            image, target = self.transform(img_id, image, target)
             return image, target
         else:
             image = self.get_image(img_id)
-            image, pre_info = self.transform(image)
+            image, pre_info = self.transform(img_id, image)
             return image, pre_info
 
     def __len__(self):
@@ -134,7 +136,7 @@ class CellDataset(Dataset):
         target = flows[0]
         return [target]
 
-    def transform(self, img, label=None, raw=False):
+    def transform(self, img_id, img, label=None, raw=False):
         # dataset argument
         # step1: reshape and normalize data
         tr, ts, rn = transforms.reshape_and_normalize_data(img, channels=self.channels, normalize=True)
@@ -142,9 +144,11 @@ class CellDataset(Dataset):
             return tr[0], label[0]
         # step2: random rotate and resize
         if self.train and label is not None:
-            rsc = utils.diameters(label[0][0])[0] / self.diam_mean if self.rescale else 1.0
-            img, label, _ = transforms.random_rotate_and_resize(tr, [label[0][1:]], scale_range=self.scale_range, rescale=[rsc], unet=self.unet)
-            img, label = map(torch.from_numpy, [img, label])
+            rsc = self.diam_scale[img_id] / self.diam_mean if self.rescale else 1.0
+            imgi, lbl, scale = transforms.random_rotate_and_resize(tr, [label[0][1:]], scale_range=self.scale_range, rescale=[rsc], unet=self.unet)
+            if self.unet and lbl.shape[1]>1 and self.rescale:
+                lbl[:,1] *= scale[:,np.newaxis,np.newaxis]**2#diam_batch[:,np.newaxis,np.newaxis]**2
+            img, label = map(torch.from_numpy, [imgi, lbl])
             return torch.squeeze(img), torch.squeeze(label)
         else:
             # eval transform

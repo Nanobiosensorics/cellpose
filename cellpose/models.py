@@ -733,6 +733,10 @@ class CellposeModel(UnetModel):
         diam_train_mean = diam_train[diam_train > 0].mean()
         self.diam_labels = diam_train_mean
         if rescale:
+            diam_train[diam_train<5] = 5.
+            if test_dataset is not None:
+                diam_test = np.array([utils.diameters(tst_ds.load_raw(k)[1][0])[0] for k in range(len(tst_ds))])
+                diam_test[diam_test<5] = 5.
             scale_range = 0.5
             models_logger.info('>>>> median diameter set to = %d'%self.diam_mean)
         else:
@@ -775,8 +779,10 @@ class CellposeModel(UnetModel):
         min_epoch = 0
         save = False
         
-        tr_ds.set_train_params(diam_mean=self.diam_mean, scale_range=scale_range, rescale=rescale, unet=self.unet)
-        tst_ds.set_train_params(diam_mean=self.diam_mean, scale_range=0, rescale=rescale, unet=self.unet)
+        tr_ds.set_train_params(diam_train, diam_mean=self.diam_mean, scale_range=scale_range, rescale=rescale, unet=self.unet)
+        
+        if test_dataset != None:
+            tst_ds.set_train_params(diam_test, diam_mean=self.diam_mean, scale_range=scale_range, rescale=rescale, unet=self.unet)
         
         for iepoch in range(self.n_epochs):
             if SGD:
@@ -795,11 +801,10 @@ class CellposeModel(UnetModel):
                 lavgt, nsum = 0., 0
                 tqdm_out = utils.TqdmToLogger(models_logger, level=logging.INFO)
                 for imgi, lbl in tqdm(tst_loader, file=tqdm_out, desc=f'Epoch {iepoch}/{self.n_epochs}:'):
-                    train_loss = self._train_step(imgi, lbl)
+                    train_loss = self._test_eval(imgi, lbl)
                     lavgt += train_loss
                     nsum += len(imgi) 
                     del imgi, lbl
-
 
                 models_logger.info('Epoch %d, Time %4.1fs, Loss %2.4f, Loss Test %2.4f, LR %2.4f'%
                         (iepoch, time.time()-tic, lavg, lavgt/nsum, self.learning_rate[iepoch]))
