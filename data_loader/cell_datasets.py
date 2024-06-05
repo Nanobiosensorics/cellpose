@@ -3,7 +3,7 @@ import torch
 from torch.utils.data import Dataset
 from cellpose import dynamics, transforms, io, utils
 
-def split_dataset(dirs, test_split=0.2):
+def split_dataset(dirs, test_split=0.2, mask_filter='_seg.npy'):
     train_paths = []
     test_paths = []
     np.random.seed(0)

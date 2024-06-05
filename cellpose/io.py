@@ -241,6 +241,7 @@ def get_label_files(image_names, mask_filter, imf=None):
     #    io_logger.info('labels found as _seg.npy files, converting to tif')
     else:
         raise ValueError('labels not provided with correct --mask_filter')
+    
     if not all([os.path.exists(label) for label in label_names]):
         raise ValueError('labels not provided for all images in train and/or test set')
 
