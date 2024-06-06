@@ -15,7 +15,7 @@ models_logger = logging.getLogger(__name__)
 from . import transforms, dynamics, utils, plot
 from .core import UnetModel, assign_device, check_mkl, parse_model_string
 
-from data_loader import CellDataLoader
+from .data_loader import CellDataLoader
 
 _MODEL_URL = 'https://www.cellpose.org/models'
 _MODEL_DIR_ENV = os.environ.get("CELLPOSE_LOCAL_MODELS_PATH")

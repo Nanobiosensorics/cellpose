@@ -1,6 +1,6 @@
 from torchvision import datasets, transforms
-from base import BaseDataLoader
-from data_loader import CellDataset
+from ..base import BaseDataLoader
+from .cell_datasets import CellDataset
 
 class CellDataLoader(BaseDataLoader):
     """
