@@ -34,6 +34,8 @@ def run(data_path, model_name, initial_model = "scratch",
 
     train_ds = CellDataset(paths=train_paths, generate_flows=True, mask_filter='_masks', channels=channels)
     test_ds = CellDataset(paths=test_paths, generate_flows=True, mask_filter='_masks', channels=channels)
+    
+    logger = io.logger_setup()
 
     model = models.CellposeModel(gpu=use_GPU, model_type=None if initial_model == 'scratch' else initial_model, diam_mean=diam_mean)
 
